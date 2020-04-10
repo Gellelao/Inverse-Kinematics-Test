@@ -31,7 +31,7 @@ public class TargetPointsController : MonoBehaviour
         var frontMostLegPoint = Rotate(midpoint, angleBetweenLegs*(numberOfLegsPerSide/2)-offset);
         for(int i = 0; i < numberOfLegsPerSide; i++){
             var thisLegPos = Rotate(frontMostLegPoint, -1*i*angleBetweenLegs);
-            var point = Instantiate(targetPointPrefab, thisLegPos*legDistanceFromBody, transform.rotation);
+            var point = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
             point.transform.parent = transform;
             leftPoints.Add(point);
         }
