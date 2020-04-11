@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using DitzelGames.FastIK;
 
 public class TargetPointsController : MonoBehaviour
 {
@@ -9,15 +10,14 @@ public class TargetPointsController : MonoBehaviour
     public float legDistanceFromBody;
     public float angleBetweenLegs;
     public float maxClimbHeight;
-    public List<GameObject> leftPoints {get; private set;}
-
-    private GameObject point;
-    private GameObject point1;
-    private GameObject point2;
+    public float distanceBeforeLegUpdate;
+    public float stepHeight;
+    private List<PointPair> leftPoints; // The order is <point, futurepoint>
+    
     
     void Start()
     {
-        leftPoints = new List<GameObject>();
+        leftPoints = new List<PointPair>();
         
         // A vector pointing out from the left of the game object at a right angle
         Vector3 midpoint = Quaternion.AngleAxis(-90, Vector3.up) * transform.forward;
@@ -32,15 +32,31 @@ public class TargetPointsController : MonoBehaviour
         for(int i = 0; i < numberOfLegsPerSide; i++){
             var thisLegPos = Rotate(frontMostLegPoint, -1*i*angleBetweenLegs);
             var point = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
-            point.transform.parent = transform;
-            leftPoints.Add(point);
+
+            var futurePoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            futurePoint.GetComponent<Renderer>().material.SetColor("_Color", Color.blue);
+            // Add future points as children, because they need to always follow the creature
+            futurePoint.transform.parent = transform;
+            
+            leftPoints.Add(new PointPair(point, futurePoint));
+        }
+
+        // Find the legs of this object and assign our targets to those legs
+        Transform leftLegs = transform.Find("LeftLegs");
+        var IKScripts = leftLegs.GetComponentsInChildren<FastIKFabric>();
+        int count = 0;
+        foreach(FastIKFabric legScript in IKScripts){
+            legScript.Target = leftPoints[count].targetPoint.transform;
+            count++;
+            if(count >= leftPoints.Count) break;
         }
     }
 
     void Update()
     {
-        // Make each point sit on the ground, within the limit of maxClimbHeight
-        foreach(GameObject point in leftPoints){
+        // Make each future point sit on the ground, within the limit of maxClimbHeight
+        foreach(PointPair pair in leftPoints){
+            GameObject point = pair.futurePoint;
             // The point in space we want to look downwards from
             Vector3 groundCastOrigin = new Vector3(point.transform.position.x, transform.position.y + maxClimbHeight, point.transform.position.z);
 
@@ -57,9 +73,54 @@ public class TargetPointsController : MonoBehaviour
                 Debug.Log("No object below " + gameObject.name);
             }
         }
+
+        foreach(PointPair pair in leftPoints){
+            GameObject point = pair.targetPoint;
+            GameObject futurePoint = pair.futurePoint;
+            
+            // Get distance between the two points
+            Vector3 distanceVector = futurePoint.transform.position - point.transform.position;
+
+
+            if(pair.tooFarApart){
+                // Move targetPoint toweards futurePoint in a stepping motion
+                // Adjust this float, it's picked arbitrarily for now
+                pair.stepTimeElapsed += Time.deltaTime;
+                Vector3 nextPos = Vector3.Lerp(point.transform.position,futurePoint.transform.position, pair.stepTimeElapsed);
+                // Add some height to the step
+                nextPos.y += stepHeight * Mathf.Sin(Mathf.Clamp01(pair.stepTimeElapsed) * Mathf.PI);
+                // Actually update the position
+                point.transform.position = nextPos;
+            }
+            else if(distanceVector.magnitude > distanceBeforeLegUpdate){
+                pair.tooFarApart = true;
+                pair.stepTimeElapsed = 0;
+            }
+
+            // The 0.1 here is to allow for some imprecision, but adjust after testing
+            if(distanceVector.magnitude < 0.01){
+                pair.tooFarApart = false;
+            }
+
+        }
     }
 
     private Vector3 Rotate(Vector3 vector, float angle){
         return Quaternion.AngleAxis(angle, Vector3.up)*vector;
+    }
+}
+
+/// <summary>
+/// A target point and its associated future point
+/// </summary>
+class PointPair{
+    public GameObject targetPoint {get; private set;}
+    public GameObject futurePoint {get; private set;}
+    public bool tooFarApart;
+    public float stepTimeElapsed;
+
+    public PointPair(GameObject targetPoint, GameObject futurePoint){
+        this.targetPoint = targetPoint;
+        this.futurePoint = futurePoint;
     }
 }
