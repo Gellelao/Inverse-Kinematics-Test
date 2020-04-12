@@ -13,49 +13,33 @@ public class TargetPointsController : MonoBehaviour
     public float distanceBeforeLegUpdate;
     public float stepHeight;
     private List<PointPair> leftPoints; // The order is <point, futurepoint>
+    private List<PointPair> rightPoints;
     
     
     void Start()
     {
         leftPoints = new List<PointPair>();
-        
-        // A vector pointing out from the left of the game object at a right angle
-        Vector3 midpoint = Quaternion.AngleAxis(-90, Vector3.up) * transform.forward;
+        rightPoints = new List<PointPair>();
 
         // Offset to take into account odd/even numbers of legs
         float offset;
         if(numberOfLegsPerSide % 2 == 0) offset = (angleBetweenLegs/2);
         else                             offset = 0;
 
-        // Create the left-hand points, starting from the front and moving backwards in increments of the given angle
-        var frontMostLegPoint = Rotate(midpoint, angleBetweenLegs*(numberOfLegsPerSide/2)-offset);
-        for(int i = 0; i < numberOfLegsPerSide; i++){
-            var thisLegPos = Rotate(frontMostLegPoint, -1*i*angleBetweenLegs);
-            var point = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
-
-            var futurePoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
-            futurePoint.GetComponent<Renderer>().material.SetColor("_Color", Color.blue);
-            // Add future points as children, because they need to always follow the creature
-            futurePoint.transform.parent = transform;
-            
-            leftPoints.Add(new PointPair(point, futurePoint));
-        }
-
-        // Find the legs of this object and assign our targets to those legs
         Transform leftLegs = transform.Find("LeftLegs");
-        var IKScripts = leftLegs.GetComponentsInChildren<FastIKFabric>();
-        int count = 0;
-        foreach(FastIKFabric legScript in IKScripts){
-            legScript.Target = leftPoints[count].targetPoint.transform;
-            count++;
-            if(count >= leftPoints.Count) break;
-        }
+        Transform rightLegs = transform.Find("RightLegs");
+
+        SetupLegsOneSide(leftPoints, leftLegs, offset, false);
+        SetupLegsOneSide(rightPoints, rightLegs, offset, true);
     }
 
     void Update()
     {
+        List<PointPair> allPoints = new List<PointPair>();
+        allPoints.AddRange(leftPoints);
+        allPoints.AddRange(rightPoints);
         // Make each future point sit on the ground, within the limit of maxClimbHeight
-        foreach(PointPair pair in leftPoints){
+        foreach(PointPair pair in allPoints){
             GameObject point = pair.futurePoint;
             // The point in space we want to look downwards from
             Vector3 groundCastOrigin = new Vector3(point.transform.position.x, transform.position.y + maxClimbHeight, point.transform.position.z);
@@ -74,7 +58,7 @@ public class TargetPointsController : MonoBehaviour
             }
         }
 
-        foreach(PointPair pair in leftPoints){
+        foreach(PointPair pair in allPoints){
             GameObject point = pair.targetPoint;
             GameObject futurePoint = pair.futurePoint;
             
@@ -84,9 +68,9 @@ public class TargetPointsController : MonoBehaviour
 
             if(pair.tooFarApart){
                 // Move targetPoint toweards futurePoint in a stepping motion
-                // Adjust this float, it's picked arbitrarily for now
-                pair.stepTimeElapsed += Time.deltaTime;
-                Vector3 nextPos = Vector3.Lerp(point.transform.position,futurePoint.transform.position, pair.stepTimeElapsed);
+                // Adjust this coefficient, it's picked arbitrarily for now
+                pair.stepTimeElapsed += Time.deltaTime * 1;
+                Vector3 nextPos = Vector3.Lerp(point.transform.position, futurePoint.transform.position, pair.stepTimeElapsed);
                 // Add some height to the step
                 nextPos.y += stepHeight * Mathf.Sin(Mathf.Clamp01(pair.stepTimeElapsed) * Mathf.PI);
                 // Actually update the position
@@ -102,6 +86,40 @@ public class TargetPointsController : MonoBehaviour
                 pair.tooFarApart = false;
             }
 
+        }
+    }
+
+    private void SetupLegsOneSide(List<PointPair> setOfPoints, Transform legsContainer, float offset, bool rightSide){
+        
+        var rotationDir = -1; // If we are dealing with the left side we want to rotate some things in the opposiute direction
+        if(rightSide) rotationDir = 1;
+
+        // A vector pointing out from the side of the creature at a right angle
+        Vector3 midPoint = Rotate(transform.forward, 90*rotationDir);
+
+        // Create the points, starting from the front and moving backwards in increments of the given angle
+        var frontMostLegPoint = Rotate(midPoint, -1*rotationDir*angleBetweenLegs*(numberOfLegsPerSide/2)+(offset*rotationDir));
+        for(int i = 0; i < numberOfLegsPerSide; i++){
+            var thisLegPos = Rotate(frontMostLegPoint, rotationDir*i*angleBetweenLegs);
+            var point = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+
+            var futurePoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            futurePoint.GetComponent<Renderer>().material.SetColor("_Color", Color.blue);
+            // Add future points as children, because they need to always follow the creature
+            futurePoint.transform.parent = transform;
+            
+            setOfPoints.Add(new PointPair(point, futurePoint));
+        }
+        Debug.Log(setOfPoints.Count);
+
+        // Find the legs of this object and assign our targets to those legs
+        var IKScripts = legsContainer.GetComponentsInChildren<FastIKFabric>();
+        int count = 0;
+        foreach(FastIKFabric legScript in IKScripts){
+            Debug.Log(count);
+            legScript.Target = setOfPoints[count].targetPoint.transform;
+            count++;
+            if(count >= setOfPoints.Count) break;
         }
     }
 
