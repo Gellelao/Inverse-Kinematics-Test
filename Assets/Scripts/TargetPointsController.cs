@@ -15,11 +15,13 @@ public class TargetPointsController : MonoBehaviour
     private List<PointPair> leftPoints; // The order is <point, futurepoint>
     private List<PointPair> rightPoints;
     
+    private int nameCounter;
     
     void Start()
     {
         leftPoints = new List<PointPair>();
         rightPoints = new List<PointPair>();
+        nameCounter = 0;
 
         // Offset to take into account odd/even numbers of legs
         float offset;
@@ -38,6 +40,8 @@ public class TargetPointsController : MonoBehaviour
         List<PointPair> allPoints = new List<PointPair>();
         allPoints.AddRange(leftPoints);
         allPoints.AddRange(rightPoints);
+        foreach(PointPair p in allPoints){
+        }
         // Make each future point sit on the ground, within the limit of maxClimbHeight
         foreach(PointPair pair in allPoints){
             GameObject point = pair.futurePoint;
@@ -58,31 +62,31 @@ public class TargetPointsController : MonoBehaviour
             }
         }
 
+        // Move the targetPoints towards futurePoints if certain conditions are met
         foreach(PointPair pair in allPoints){
-            GameObject point = pair.targetPoint;
+            GameObject targetPoint = pair.targetPoint;
             GameObject futurePoint = pair.futurePoint;
             
             // Get distance between the two points
-            Vector3 distanceVector = futurePoint.transform.position - point.transform.position;
+            Vector3 distanceVector = futurePoint.transform.position - targetPoint.transform.position;
 
-
-            if(pair.tooFarApart){
-                // Move targetPoint toweards futurePoint in a stepping motion
+            // Move targetPoint towards futurePoint in a stepping motion
+            if(pair.tooFarApart && CorrespondingPairIsGrounded(pair)){
                 // Adjust this coefficient, it's picked arbitrarily for now
                 pair.stepTimeElapsed += Time.deltaTime * 1;
-                Vector3 nextPos = Vector3.Lerp(point.transform.position, futurePoint.transform.position, pair.stepTimeElapsed);
+                Vector3 nextPos = Vector3.Lerp(targetPoint.transform.position, futurePoint.transform.position, pair.stepTimeElapsed);
                 // Add some height to the step
                 nextPos.y += stepHeight * Mathf.Sin(Mathf.Clamp01(pair.stepTimeElapsed) * Mathf.PI);
                 // Actually update the position
-                point.transform.position = nextPos;
+                targetPoint.transform.position = nextPos;
             }
+            // Sets this pointPair to start reuniting next update
             else if(distanceVector.magnitude > distanceBeforeLegUpdate){
                 pair.tooFarApart = true;
                 pair.stepTimeElapsed = 0;
             }
-
-            // The 0.1 here is to allow for some imprecision, but adjust after testing
-            if(distanceVector.magnitude < 0.01){
+            // Stop moving once target is reached
+            if(distanceVector.magnitude < 0.1){// The 0.1 here is to allow for some imprecision, but adjust after testing
                 pair.tooFarApart = false;
             }
 
@@ -101,25 +105,53 @@ public class TargetPointsController : MonoBehaviour
         var frontMostLegPoint = Rotate(midPoint, -1*rotationDir*angleBetweenLegs*(numberOfLegsPerSide/2)+(offset*rotationDir));
         for(int i = 0; i < numberOfLegsPerSide; i++){
             var thisLegPos = Rotate(frontMostLegPoint, rotationDir*i*angleBetweenLegs);
-            var point = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            var targetPoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            targetPoint.name = "TargetPoint" + nameCounter;
 
             var futurePoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            futurePoint.name = "FuturePoint" + nameCounter;
             futurePoint.GetComponent<Renderer>().material.SetColor("_Color", Color.blue);
             // Add future points as children, because they need to always follow the creature
             futurePoint.transform.parent = transform;
             
-            setOfPoints.Add(new PointPair(point, futurePoint));
+            setOfPoints.Add(new PointPair(targetPoint, futurePoint));
+            nameCounter++;
         }
-        Debug.Log(setOfPoints.Count);
+
+        // Shift every other leg to get a zigzag patter
+        var counter = 0;
+        if(rightSide) counter = 1;
+        foreach(PointPair pair in setOfPoints){
+            // Only worry about the targetPoint, the futurePoints should stay symmetrical
+            var target = pair.targetPoint;
+            if(counter % 2 == 0)target.transform.position = target.transform.position + target.transform.forward * 0.5f;
+            counter++;
+        }
 
         // Find the legs of this object and assign our targets to those legs
         var IKScripts = legsContainer.GetComponentsInChildren<FastIKFabric>();
         int count = 0;
         foreach(FastIKFabric legScript in IKScripts){
-            Debug.Log(count);
             legScript.Target = setOfPoints[count].targetPoint.transform;
             count++;
             if(count >= setOfPoints.Count) break;
+        }
+    }
+
+    private bool CorrespondingPairIsGrounded(PointPair pair){
+        // Get index of that pair from leftPoints, if it is in there
+        var index = leftPoints.IndexOf(pair);
+        if(index < 0){
+            index = rightPoints.IndexOf(pair);
+            if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
+            // The pair is in rightPoints, so look for the corresponding pair in leftPoints
+            var corresponding = leftPoints[index];
+            return !corresponding.tooFarApart; // Will be close enough to grounded if the pair is not too far apart
+        }
+        else{
+            // The pair is in leftPoints, so look for the corresponding pair in rightPoints
+            var corresponding = rightPoints[index];
+            return !corresponding.tooFarApart; // Will be close enough to grounded if the pair is not too far apart
         }
     }
 
@@ -140,5 +172,10 @@ class PointPair{
     public PointPair(GameObject targetPoint, GameObject futurePoint){
         this.targetPoint = targetPoint;
         this.futurePoint = futurePoint;
+        this.tooFarApart = false;
+    }
+
+    public override string ToString(){
+        return "Target[" + targetPoint.name + "], Future[" + futurePoint.name + "]";
     }
 }
