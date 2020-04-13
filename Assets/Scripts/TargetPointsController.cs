@@ -10,10 +10,13 @@ public class TargetPointsController : MonoBehaviour
     public float legDistanceFromBody;
     public float angleBetweenLegs;
     public float maxClimbHeight;
-    public float distanceBeforeLegUpdate;
+    public float maximumLegLag;
+    public float legSpeed;
+    public float forecastDistance;
     public float stepHeight;
     private List<PointPair> leftPoints; // The order is <point, futurepoint>
     private List<PointPair> rightPoints;
+    private List<PointPair> allPoints; // This list is just the two combined for easy iteration
     
     private int nameCounter;
     
@@ -21,6 +24,7 @@ public class TargetPointsController : MonoBehaviour
     {
         leftPoints = new List<PointPair>();
         rightPoints = new List<PointPair>();
+        allPoints = new List<PointPair>();
         nameCounter = 0;
 
         // Offset to take into account odd/even numbers of legs
@@ -33,64 +37,9 @@ public class TargetPointsController : MonoBehaviour
 
         SetupLegsOneSide(leftPoints, leftLegs, offset, false);
         SetupLegsOneSide(rightPoints, rightLegs, offset, true);
-    }
 
-    void Update()
-    {
-        List<PointPair> allPoints = new List<PointPair>();
         allPoints.AddRange(leftPoints);
         allPoints.AddRange(rightPoints);
-        foreach(PointPair p in allPoints){
-        }
-        // Make each future point sit on the ground, within the limit of maxClimbHeight
-        foreach(PointPair pair in allPoints){
-            GameObject point = pair.futurePoint;
-            // The point in space we want to look downwards from
-            Vector3 groundCastOrigin = new Vector3(point.transform.position.x, transform.position.y + maxClimbHeight, point.transform.position.z);
-
-            int layerMask = 1 << 8; // Layer 8 is the targetPoints layer
-            layerMask = ~layerMask; // Invert it to exlude that layer - we don't want to collide with the targetPoint objects
-
-            var down = new Vector3(0,-1,0);
-
-            RaycastHit hit;
-            if(Physics.Raycast(groundCastOrigin, down, out hit, Mathf.Infinity, layerMask)){
-                point.transform.position = new Vector3(point.transform.position.x, hit.point.y, point.transform.position.z);
-            }
-            else{
-                Debug.Log("No object below " + gameObject.name);
-            }
-        }
-
-        // Move the targetPoints towards futurePoints if certain conditions are met
-        foreach(PointPair pair in allPoints){
-            GameObject targetPoint = pair.targetPoint;
-            GameObject futurePoint = pair.futurePoint;
-            
-            // Get distance between the two points
-            Vector3 distanceVector = futurePoint.transform.position - targetPoint.transform.position;
-
-            // Move targetPoint towards futurePoint in a stepping motion
-            if(pair.tooFarApart && CorrespondingPairIsGrounded(pair)){
-                // Adjust this coefficient, it's picked arbitrarily for now
-                pair.stepTimeElapsed += Time.deltaTime * 1;
-                Vector3 nextPos = Vector3.Lerp(targetPoint.transform.position, futurePoint.transform.position, pair.stepTimeElapsed);
-                // Add some height to the step
-                nextPos.y += stepHeight * Mathf.Sin(Mathf.Clamp01(pair.stepTimeElapsed) * Mathf.PI);
-                // Actually update the position
-                targetPoint.transform.position = nextPos;
-            }
-            // Sets this pointPair to start reuniting next update
-            else if(distanceVector.magnitude > distanceBeforeLegUpdate){
-                pair.tooFarApart = true;
-                pair.stepTimeElapsed = 0;
-            }
-            // Stop moving once target is reached
-            if(distanceVector.magnitude < 0.1){// The 0.1 here is to allow for some imprecision, but adjust after testing
-                pair.tooFarApart = false;
-            }
-
-        }
     }
 
     private void SetupLegsOneSide(List<PointPair> setOfPoints, Transform legsContainer, float offset, bool rightSide){
@@ -118,7 +67,7 @@ public class TargetPointsController : MonoBehaviour
             nameCounter++;
         }
 
-        // Shift every other leg to get a zigzag patter
+        // Shift every other leg to get a zigzag pattern
         var counter = 0;
         if(rightSide) counter = 1;
         foreach(PointPair pair in setOfPoints){
@@ -135,6 +84,50 @@ public class TargetPointsController : MonoBehaviour
             legScript.Target = setOfPoints[count].targetPoint.transform;
             count++;
             if(count >= setOfPoints.Count) break;
+        }
+    }
+
+    void Update()
+    {
+        foreach(PointPair p in allPoints){
+        }
+        // Make each future point sit on the ground, within the limit of maxClimbHeight
+        foreach(PointPair pair in allPoints){
+            GameObject point = pair.futurePoint;
+            // The point in space we want to look downwards from
+            Vector3 groundCastOrigin = new Vector3(point.transform.position.x, transform.position.y + maxClimbHeight, point.transform.position.z);
+
+            int layerMask = 1 << 8; // Layer 8 is the targetPoints layer
+            layerMask = ~layerMask; // Invert it to exlude that layer - we don't want to collide with the targetPoint objects
+
+            var down = new Vector3(0,-1,0);
+
+            RaycastHit hit;
+            if(Physics.Raycast(groundCastOrigin, down, out hit, Mathf.Infinity, layerMask)){
+                point.transform.position = new Vector3(point.transform.position.x, hit.point.y, point.transform.position.z);
+            }
+            else{
+                Debug.Log("No object below " + gameObject.name);
+            }
+        }
+
+        // Move the targetPoints towards futurePoints if certain conditions are met
+        Debug.Log("========================");
+        foreach(PointPair pair in allPoints){
+            Debug.Log("Pointpair " + pair + ", tooFarApart: " + pair.tooFarApart);
+
+            if(CorrespondingPairIsGrounded(pair)){
+                pair.TryMove(legSpeed, stepHeight);
+            }
+            // Sets this pointPair to start reuniting next update
+            if(!pair.tooFarApart && pair.GetDistanceToFuturePoint() > maximumLegLag){
+                pair.StartMove(forecastDistance);
+            }
+            // Stop moving once target is reached
+            if(pair.GetDistanceToFuturePoint() < maximumLegLag){// The 0.1 here is to allow for some imprecision, but adjust after testing
+                pair.EndMove();
+            }
+
         }
     }
 
@@ -167,12 +160,51 @@ class PointPair{
     public GameObject targetPoint {get; private set;}
     public GameObject futurePoint {get; private set;}
     public bool tooFarApart;
-    public float stepTimeElapsed;
+    public Vector3 forecastTarget {get; private set;}
+
+    public float initialDistanceToForecast;
 
     public PointPair(GameObject targetPoint, GameObject futurePoint){
         this.targetPoint = targetPoint;
         this.futurePoint = futurePoint;
-        this.tooFarApart = false;
+        tooFarApart = false;
+        initialDistanceToForecast = (futurePoint.transform.position - targetPoint.transform.position).magnitude;
+    }
+
+    public void StartMove(float forecastDistance){
+        Debug.Log("start move");
+        tooFarApart = true;
+        forecastTarget = futurePoint.transform.position + futurePoint.transform.forward * forecastDistance;
+        initialDistanceToForecast = GetDistanceToForecast();
+    }
+
+    public void EndMove(){
+        Debug.Log("end move");
+        tooFarApart = false;
+        // targetPoint.transform.position = futurePoint.transform.position;
+    }
+
+    public void TryMove(float speed, float stepHeight){
+        Debug.Log("try move");
+        if(!tooFarApart) return;
+        Debug.Log("try move reaches past first return");
+        var remainingDistanceToForecast = GetDistanceToForecast();
+        var target = forecastTarget;
+        if(remainingDistanceToForecast > initialDistanceToForecast/2){
+            // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
+            targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget+forecastTarget + Vector3.up*stepHeight, speed);
+        }
+        else{
+            targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget, speed);
+        }
+    }
+
+    public float GetDistanceToFuturePoint(){
+        return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
+    }
+
+    private float GetDistanceToForecast(){
+        return (forecastTarget - this.targetPoint.transform.position).magnitude;
     }
 
     public override string ToString(){
