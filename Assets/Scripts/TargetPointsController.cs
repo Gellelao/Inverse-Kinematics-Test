@@ -27,6 +27,8 @@ public class TargetPointsController : MonoBehaviour
         allPoints = new List<PointPair>();
         nameCounter = 0;
 
+        if(maximumLegLag < forecastDistance) throw new UnityException("Maximum Leg lag should be >= forecastDistance");
+
         // Offset to take into account odd/even numbers of legs
         float offset;
         if(numberOfLegsPerSide % 2 == 0) offset = (angleBetweenLegs/2);
@@ -71,9 +73,8 @@ public class TargetPointsController : MonoBehaviour
         var counter = 0;
         if(rightSide) counter = 1;
         foreach(PointPair pair in setOfPoints){
-            // Only worry about the targetPoint, the futurePoints should stay symmetrical
-            var target = pair.targetPoint;
-            if(counter % 2 == 0)target.transform.position = target.transform.position + target.transform.forward * 0.5f;
+            var target = pair.futurePoint;
+            if(counter % 2 == 0)target.transform.position = target.transform.position + target.transform.forward * 0.8f;
             counter++;
         }
 
@@ -107,7 +108,7 @@ public class TargetPointsController : MonoBehaviour
                 point.transform.position = new Vector3(point.transform.position.x, hit.point.y, point.transform.position.z);
             }
             else{
-                Debug.Log("No object below " + gameObject.name);
+                Debug.Log("No object below " + point.name);
             }
         }
 
@@ -123,10 +124,6 @@ public class TargetPointsController : MonoBehaviour
             if(!pair.tooFarApart && pair.GetDistanceToFuturePoint() > maximumLegLag){
                 pair.StartMove(forecastDistance);
             }
-            // Stop moving once target is reached
-            if(pair.GetDistanceToFuturePoint() < maximumLegLag){// The 0.1 here is to allow for some imprecision, but adjust after testing
-                pair.EndMove();
-            }
 
         }
     }
@@ -139,12 +136,12 @@ public class TargetPointsController : MonoBehaviour
             if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
             // The pair is in rightPoints, so look for the corresponding pair in leftPoints
             var corresponding = leftPoints[index];
-            return !corresponding.tooFarApart; // Will be close enough to grounded if the pair is not too far apart
+            return !corresponding.onDescent; // Will be close enough to grounded if the pair is not too far apart
         }
         else{
             // The pair is in leftPoints, so look for the corresponding pair in rightPoints
             var corresponding = rightPoints[index];
-            return !corresponding.tooFarApart; // Will be close enough to grounded if the pair is not too far apart
+            return !corresponding.onDescent; // Will be close enough to grounded if the pair is not too far apart
         }
     }
 
@@ -160,6 +157,7 @@ class PointPair{
     public GameObject targetPoint {get; private set;}
     public GameObject futurePoint {get; private set;}
     public bool tooFarApart;
+    public bool onDescent;
     public Vector3 forecastTarget {get; private set;}
 
     public float initialDistanceToForecast;
@@ -174,14 +172,9 @@ class PointPair{
     public void StartMove(float forecastDistance){
         Debug.Log("start move");
         tooFarApart = true;
+        Debug.DrawRay(futurePoint.transform.position, futurePoint.transform.forward * forecastDistance, Color.yellow, 5);
         forecastTarget = futurePoint.transform.position + futurePoint.transform.forward * forecastDistance;
         initialDistanceToForecast = GetDistanceToForecast();
-    }
-
-    public void EndMove(){
-        Debug.Log("end move");
-        tooFarApart = false;
-        // targetPoint.transform.position = futurePoint.transform.position;
     }
 
     public void TryMove(float speed, float stepHeight){
@@ -189,13 +182,20 @@ class PointPair{
         if(!tooFarApart) return;
         Debug.Log("try move reaches past first return");
         var remainingDistanceToForecast = GetDistanceToForecast();
-        var target = forecastTarget;
-        if(remainingDistanceToForecast > initialDistanceToForecast/2){
+        if(remainingDistanceToForecast > initialDistanceToForecast/1.5){
             // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
-            targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget+forecastTarget + Vector3.up*stepHeight, speed);
+            Debug.DrawLine(targetPoint.transform.position, forecastTarget + Vector3.up*stepHeight, Color.red, 0.5f);
+            targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget + Vector3.up*stepHeight, speed);
+            onDescent = false;
         }
         else{
             targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget, speed);
+            onDescent = true;
+        }
+        Debug.Log("Initial distance to forecast/10: " + initialDistanceToForecast/10);
+        if(GetDistanceToForecast() < initialDistanceToForecast/10){// The 0.1 here is to allow for some imprecision, but adjust after testing
+            tooFarApart = false;
+            onDescent = false;
         }
     }
 
@@ -203,7 +203,7 @@ class PointPair{
         return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
     }
 
-    private float GetDistanceToForecast(){
+    public float GetDistanceToForecast(){
         return (forecastTarget - this.targetPoint.transform.position).magnitude;
     }
 
