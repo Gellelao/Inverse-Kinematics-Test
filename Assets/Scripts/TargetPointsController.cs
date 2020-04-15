@@ -166,7 +166,7 @@ class PointPair{
         this.targetPoint = targetPoint;
         this.futurePoint = futurePoint;
         tooFarApart = false;
-        initialDistanceToForecast = Mathf.Sqrt((futurePoint.transform.position - targetPoint.transform.position).sqrMagnitude);
+        initialDistanceToForecast = (futurePoint.transform.position - targetPoint.transform.position).magnitude;
     }
 
     public void StartMove(float forecastDistance){
@@ -200,11 +200,11 @@ class PointPair{
     }
 
     public float GetDistanceToFuturePoint(){
-        return Mathf.Sqrt((futurePoint.transform.position - targetPoint.transform.position).sqrMagnitude);
+        return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
     }
 
     public float GetDistanceToForecast(){
-        return Mathf.Sqrt((forecastTarget - this.targetPoint.transform.position).sqrMagnitude);
+        return (forecastTarget - this.targetPoint.transform.position).magnitude;
     }
 
     public override string ToString(){
