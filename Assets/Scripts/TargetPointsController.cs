@@ -70,13 +70,13 @@ public class TargetPointsController : MonoBehaviour
         }
 
         // Shift every other leg to get a zigzag pattern
-        var counter = 0;
-        if(rightSide) counter = 1;
-        foreach(PointPair pair in setOfPoints){
-            var target = pair.futurePoint;
-            if(counter % 2 == 0)target.transform.position = target.transform.position + target.transform.forward * 0.8f;
-            counter++;
-        }
+        // var counter = 0;
+        // if(rightSide) counter = 1;
+        // foreach(PointPair pair in setOfPoints){
+        //     var target = pair.futurePoint;
+        //     if(counter % 2 == 0)target.transform.position = target.transform.position + target.transform.forward * 0.8f;
+        //     counter++;
+        // }
 
         // Find the legs of this object and assign our targets to those legs
         var IKScripts = legsContainer.GetComponentsInChildren<FastIKFabric>();
@@ -166,7 +166,7 @@ class PointPair{
         this.targetPoint = targetPoint;
         this.futurePoint = futurePoint;
         tooFarApart = false;
-        initialDistanceToForecast = (futurePoint.transform.position - targetPoint.transform.position).magnitude;
+        initialDistanceToForecast = Mathf.Sqrt((futurePoint.transform.position - targetPoint.transform.position).sqrMagnitude);
     }
 
     public void StartMove(float forecastDistance){
@@ -200,11 +200,11 @@ class PointPair{
     }
 
     public float GetDistanceToFuturePoint(){
-        return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
+        return Mathf.Sqrt((futurePoint.transform.position - targetPoint.transform.position).sqrMagnitude);
     }
 
     public float GetDistanceToForecast(){
-        return (forecastTarget - this.targetPoint.transform.position).magnitude;
+        return Mathf.Sqrt((forecastTarget - this.targetPoint.transform.position).sqrMagnitude);
     }
 
     public override string ToString(){
