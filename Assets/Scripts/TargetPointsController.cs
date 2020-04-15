@@ -10,7 +10,8 @@ public class TargetPointsController : MonoBehaviour
     public float legDistanceFromBody;
     public float angleBetweenLegs;
     public float maxClimbHeight;
-    public float maximumLegLag;
+    public float maxLegLag;
+    public float maxDistForLegToBeInRange;
     public float legSpeed;
     public float forecastDistance;
     public float stepHeight;
@@ -27,7 +28,7 @@ public class TargetPointsController : MonoBehaviour
         allPoints = new List<PointPair>();
         nameCounter = 0;
 
-        if(maximumLegLag < forecastDistance) throw new UnityException("Maximum Leg lag should be >= forecastDistance");
+        if(maxLegLag < forecastDistance) throw new UnityException("Maximum Leg lag should be >= forecastDistance");
 
         // Offset to take into account odd/even numbers of legs
         float offset;
@@ -65,7 +66,7 @@ public class TargetPointsController : MonoBehaviour
             // Add future points as children, because they need to always follow the creature
             futurePoint.transform.parent = transform;
             
-            setOfPoints.Add(new PointPair(targetPoint, futurePoint));
+            setOfPoints.Add(new PointPair(this, targetPoint, futurePoint));
             nameCounter++;
         }
 
@@ -110,25 +111,18 @@ public class TargetPointsController : MonoBehaviour
             else{
                 Debug.Log("No object below " + point.name);
             }
+
+            // Maybe do a check in a small radius to see if there s anything higher, and default to that if possible?
         }
 
         // Move the targetPoints towards futurePoints if certain conditions are met
         Debug.Log("========================");
         foreach(PointPair pair in allPoints){
-            Debug.Log("Pointpair " + pair + ", tooFarApart: " + pair.tooFarApart);
-
-            if(CorrespondingPairIsGrounded(pair)){
-                pair.TryMove(legSpeed, stepHeight);
-            }
-            // Sets this pointPair to start reuniting next update
-            if(!pair.tooFarApart && pair.GetDistanceToFuturePoint() > maximumLegLag){
-                pair.StartMove(forecastDistance);
-            }
-
+            pair.Update();
         }
     }
 
-    private bool CorrespondingPairIsGrounded(PointPair pair){
+    private bool CorrespondingPairIsNearFuturePoint(PointPair pair){
         // Get index of that pair from leftPoints, if it is in there
         var index = leftPoints.IndexOf(pair);
         if(index < 0){
@@ -136,66 +130,56 @@ public class TargetPointsController : MonoBehaviour
             if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
             // The pair is in rightPoints, so look for the corresponding pair in leftPoints
             var corresponding = leftPoints[index];
-            return !corresponding.onDescent; // Will be close enough to grounded if the pair is not too far apart
+            return corresponding.WithinRangeOfFuturePoint(); // Will be close enough to grounded if the pair is not too far apart
         }
         else{
             // The pair is in leftPoints, so look for the corresponding pair in rightPoints
             var corresponding = rightPoints[index];
-            return !corresponding.onDescent; // Will be close enough to grounded if the pair is not too far apart
+            return corresponding.WithinRangeOfFuturePoint(); // Will be close enough to grounded if the pair is not too far apart
         }
     }
 
     private Vector3 Rotate(Vector3 vector, float angle){
         return Quaternion.AngleAxis(angle, Vector3.up)*vector;
     }
-}
+
+    
 
 /// <summary>
 /// A target point and its associated future point
 /// </summary>
 class PointPair{
+    private TargetPointsController controller;
     public GameObject targetPoint {get; private set;}
     public GameObject futurePoint {get; private set;}
-    public bool tooFarApart;
-    public bool onDescent;
-    public Vector3 forecastTarget {get; private set;}
 
-    public float initialDistanceToForecast;
+    private float initialDistanceToFuturePoint = 0;
 
-    public PointPair(GameObject targetPoint, GameObject futurePoint){
+    public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint){
+        this.controller = controller;
         this.targetPoint = targetPoint;
         this.futurePoint = futurePoint;
-        tooFarApart = false;
-        initialDistanceToForecast = (futurePoint.transform.position - targetPoint.transform.position).magnitude;
+
+        initialDistanceToFuturePoint = 0;
     }
 
-    public void StartMove(float forecastDistance){
-        Debug.Log("start move");
-        tooFarApart = true;
-        Debug.DrawRay(futurePoint.transform.position, futurePoint.transform.forward * forecastDistance, Color.yellow, 5);
-        forecastTarget = futurePoint.transform.position + futurePoint.transform.forward * forecastDistance;
-        initialDistanceToForecast = GetDistanceToForecast();
-    }
+    public void Update(){
+        
+        if(TooFarFromFuturePoint()) initialDistanceToFuturePoint = GetDistanceToFuturePoint();
 
-    public void TryMove(float speed, float stepHeight){
-        Debug.Log("try move");
-        if(!tooFarApart) return;
-        Debug.Log("try move reaches past first return");
-        var remainingDistanceToForecast = GetDistanceToForecast();
-        if(remainingDistanceToForecast > initialDistanceToForecast/1.5){
-            // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
-            Debug.DrawLine(targetPoint.transform.position, forecastTarget + Vector3.up*stepHeight, Color.red, 0.5f);
-            targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget + Vector3.up*stepHeight, speed);
-            onDescent = false;
-        }
-        else{
-            targetPoint.transform.position = Vector3.MoveTowards(targetPoint.transform.position, forecastTarget, speed);
-            onDescent = true;
-        }
-        Debug.Log("Initial distance to forecast/10: " + initialDistanceToForecast/10);
-        if(GetDistanceToForecast() < initialDistanceToForecast/10){// The 0.1 here is to allow for some imprecision, but adjust after testing
-            tooFarApart = false;
-            onDescent = false;
+        if(initialDistanceToFuturePoint > 0){
+            var currentPos = targetPoint.transform.position;
+            var futurePos = futurePoint.transform.position;
+            var peakOfTheArc = futurePos + Vector3.up*controller.stepHeight;
+
+            if(GetDistanceToFuturePoint() > initialDistanceToFuturePoint/2){
+                // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
+                targetPoint.transform.position = Vector3.MoveTowards(currentPos, peakOfTheArc, controller.legSpeed);
+            }
+            else{
+                targetPoint.transform.position = Vector3.MoveTowards(currentPos, futurePos, controller.legSpeed);
+            }
+            if(WithinRangeOfFuturePoint()) initialDistanceToFuturePoint = 0;
         }
     }
 
@@ -203,11 +187,18 @@ class PointPair{
         return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
     }
 
-    public float GetDistanceToForecast(){
-        return (forecastTarget - this.targetPoint.transform.position).magnitude;
+    public bool WithinRangeOfFuturePoint(){
+
+        return GetDistanceToFuturePoint() <= controller.maxDistForLegToBeInRange;
+    }
+
+    public bool TooFarFromFuturePoint(){
+
+        return GetDistanceToFuturePoint() >= controller.maxLegLag;
     }
 
     public override string ToString(){
         return "Target[" + targetPoint.name + "], Future[" + futurePoint.name + "]";
     }
+}
 }
