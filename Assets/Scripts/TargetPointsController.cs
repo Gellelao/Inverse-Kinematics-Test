@@ -145,60 +145,70 @@ public class TargetPointsController : MonoBehaviour
 
     
 
-/// <summary>
-/// A target point and its associated future point
-/// </summary>
-class PointPair{
-    private TargetPointsController controller;
-    public GameObject targetPoint {get; private set;}
-    public GameObject futurePoint {get; private set;}
+    /// <summary>
+    /// A target point and its associated future point
+    /// </summary>
+    class PointPair{
+        private TargetPointsController controller;
+        public GameObject targetPoint {get; private set;}
+        public GameObject futurePoint {get; private set;}
 
-    private float initialDistanceToFuturePoint = 0;
+        private float initialDistanceToFuturePoint = 0;
 
-    public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint){
-        this.controller = controller;
-        this.targetPoint = targetPoint;
-        this.futurePoint = futurePoint;
+        public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint){
+            this.controller = controller;
+            this.targetPoint = targetPoint;
+            this.futurePoint = futurePoint;
 
-        initialDistanceToFuturePoint = 0;
-    }
+            initialDistanceToFuturePoint = 0;
+        }
 
-    public void Update(){
-        
-        if(TooFarFromFuturePoint()) initialDistanceToFuturePoint = GetDistanceToFuturePoint();
+        public void Update(){
+            
+            if(TooFarFromFuturePoint()) initialDistanceToFuturePoint = GetDistanceToFuturePoint();
 
-        if(initialDistanceToFuturePoint > 0){
-            var currentPos = targetPoint.transform.position;
-            var futurePos = futurePoint.transform.position;
-            var peakOfTheArc = futurePos + Vector3.up*controller.stepHeight;
+            if(initialDistanceToFuturePoint > 0){
+                var currentPos = targetPoint.transform.position;
+                // Refactor how th forecast is added here -> needs to be built into surrounding code like the if check below
+                var futurePos = futurePoint.transform.position + controller.transform.forward * controller.forecastDistance;
+                var peakOfTheArc = futurePos + Vector3.up*controller.stepHeight;
+                var stepDistance = controller.legSpeed*Time.deltaTime;
 
-            if(GetDistanceToFuturePoint() > initialDistanceToFuturePoint/2){
-                // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
-                targetPoint.transform.position = Vector3.MoveTowards(currentPos, peakOfTheArc, controller.legSpeed);
+                // Have to add stepDistance here to prevent the MoveTowards function thinking it is already at target and refusing to move the foot
+                if(GetDistanceToFuturePoint() > (initialDistanceToFuturePoint/2) + stepDistance){
+                    // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
+                    targetPoint.transform.position = Vector3.MoveTowards(currentPos, peakOfTheArc, stepDistance);
+                }
+                else{
+                    targetPoint.transform.position = Vector3.MoveTowards(currentPos, futurePos, stepDistance);
+                }
+                if(WithinRangeOfFuturePoint()) initialDistanceToFuturePoint = 0;
             }
-            else{
-                targetPoint.transform.position = Vector3.MoveTowards(currentPos, futurePos, controller.legSpeed);
-            }
-            if(WithinRangeOfFuturePoint()) initialDistanceToFuturePoint = 0;
+        }
+
+        public float GetDistanceToFuturePoint(){
+            return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
+        }
+
+        private Vector3 GetForecast(){
+            var initial = futurePoint.transform.position + controller.transform.forward * controller.forecastDistance;
+            // if base is a lot lower than futurepoint just return futurepoint
+            // otherwise check above base pos to find the highest y for that x and z
+            return initial;
+        }
+
+        public bool WithinRangeOfFuturePoint(){
+
+            return GetDistanceToFuturePoint() <= controller.maxDistForLegToBeInRange;
+        }
+
+        public bool TooFarFromFuturePoint(){
+
+            return GetDistanceToFuturePoint() >= controller.maxLegLag;
+        }
+
+        public override string ToString(){
+            return "Target[" + targetPoint.name + "], Future[" + futurePoint.name + "]";
         }
     }
-
-    public float GetDistanceToFuturePoint(){
-        return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
-    }
-
-    public bool WithinRangeOfFuturePoint(){
-
-        return GetDistanceToFuturePoint() <= controller.maxDistForLegToBeInRange;
-    }
-
-    public bool TooFarFromFuturePoint(){
-
-        return GetDistanceToFuturePoint() >= controller.maxLegLag;
-    }
-
-    public override string ToString(){
-        return "Target[" + targetPoint.name + "], Future[" + futurePoint.name + "]";
-    }
-}
 }

@@ -2098,9 +2098,9 @@ MonoBehaviour:
   angleBetweenLegs: 30
   maxClimbHeight: 5
   maxLegLag: 1
-  maxDistForLegToBeInRange: 0.01
-  legSpeed: 0.05
-  forecastDistance: 1
+  maxDistForLegToBeInRange: 0.05
+  legSpeed: 15
+  forecastDistance: 0.01
   stepHeight: 0.5
 --- !u!1 &996952016
 GameObject:
@@ -3258,7 +3258,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3521cc4acee5fc468188e03a1253f51, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 3
+  speed: 6
   jumpSpeed: 8
   gravity: 20
   rotationSpeed: 10
