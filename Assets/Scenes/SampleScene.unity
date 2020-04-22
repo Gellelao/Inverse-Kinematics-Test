@@ -2093,15 +2093,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetPointPrefab: {fileID: 8859868302747069723, guid: 238d9f1c1ba1b3d40ba4b2ac3ce2d2ac,
     type: 3}
-  numberOfLegsPerSide: 1
-  legDistanceFromBody: 2
+  numberOfLegsPerSide: 4
+  legDistanceFromBody: 3
   angleBetweenLegs: 30
   maxClimbHeight: 5
   maxLegLag: 1
   maxDistForLegToBeInRange: 0.05
-  legSpeed: 15
-  forecastDistance: 0.01
-  stepHeight: 0.5
+  legSpeed: 25
+  forecastDistance: 1
+  stepHeight: 0
+  maximumDownstep: 5
 --- !u!1 &996952016
 GameObject:
   m_ObjectHideFlags: 0
@@ -3219,7 +3220,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2122400535}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.714, y: 2.04, z: -7.093}
+  m_LocalPosition: {x: 5.714, y: 1.31, z: -7.093}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 969208573}

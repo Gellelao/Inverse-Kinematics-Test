@@ -15,6 +15,7 @@ public class TargetPointsController : MonoBehaviour
     public float legSpeed;
     public float forecastDistance;
     public float stepHeight;
+    public float maximumDownstep;
     private List<PointPair> leftPoints; // The order is <point, futurepoint>
     private List<PointPair> rightPoints;
     private List<PointPair> allPoints; // This list is just the two combined for easy iteration
@@ -109,14 +110,13 @@ public class TargetPointsController : MonoBehaviour
                 point.transform.position = new Vector3(point.transform.position.x, hit.point.y, point.transform.position.z);
             }
             else{
-                Debug.Log("No object below " + point.name);
+                // Debug.Log("No object below " + point.name);
             }
 
             // Maybe do a check in a small radius to see if there s anything higher, and default to that if possible?
         }
 
         // Move the targetPoints towards futurePoints if certain conditions are met
-        Debug.Log("========================");
         foreach(PointPair pair in allPoints){
             pair.Update();
         }
@@ -130,12 +130,12 @@ public class TargetPointsController : MonoBehaviour
             if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
             // The pair is in rightPoints, so look for the corresponding pair in leftPoints
             var corresponding = leftPoints[index];
-            return corresponding.WithinRangeOfFuturePoint(); // Will be close enough to grounded if the pair is not too far apart
+            return corresponding.WithinRangeOfForecast();
         }
         else{
             // The pair is in leftPoints, so look for the corresponding pair in rightPoints
             var corresponding = rightPoints[index];
-            return corresponding.WithinRangeOfFuturePoint(); // Will be close enough to grounded if the pair is not too far apart
+            return corresponding.WithinRangeOfForecast();
         }
     }
 
@@ -153,36 +153,47 @@ public class TargetPointsController : MonoBehaviour
         public GameObject targetPoint {get; private set;}
         public GameObject futurePoint {get; private set;}
 
-        private float initialDistanceToFuturePoint = 0;
+        private float initialDistanceToForecast = 0;
 
         public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint){
             this.controller = controller;
             this.targetPoint = targetPoint;
             this.futurePoint = futurePoint;
 
-            initialDistanceToFuturePoint = 0;
+            initialDistanceToForecast = 0;
         }
 
+        // Need to fix sliding when forecastdistance is set to any significant amount
         public void Update(){
-            
-            if(TooFarFromFuturePoint()) initialDistanceToFuturePoint = GetDistanceToFuturePoint();
+            // Only move this leg if the matching leg on the other side of the body is close to grounded
+            // Couple of problems:
+            // * Doesn't stop all 4 legs on one side from moveing at once, which looks weird
+            // * Still some stickiness, seems like when legs are already outstretched, they wont move to normal pos? Might need some kind of direction check to see if foot is
+            //   in front or beind of forecast
+            if(controller.CorrespondingPairIsNearFuturePoint(this))return;
 
-            if(initialDistanceToFuturePoint > 0){
+            // Remake this check to only look backwards, there'll be issues when the forecast is too big and it thinks the leg is lagging behind but is actually too far ahead
+            if(TooFarFromFuturePoint()){
+                initialDistanceToForecast = GetDistanceToForecast();
+            }
+
+            if(initialDistanceToForecast > 0){
                 var currentPos = targetPoint.transform.position;
-                // Refactor how th forecast is added here -> needs to be built into surrounding code like the if check below
-                var futurePos = futurePoint.transform.position + controller.transform.forward * controller.forecastDistance;
+                var futurePos = GetForecast();
                 var peakOfTheArc = futurePos + Vector3.up*controller.stepHeight;
                 var stepDistance = controller.legSpeed*Time.deltaTime;
 
                 // Have to add stepDistance here to prevent the MoveTowards function thinking it is already at target and refusing to move the foot
-                if(GetDistanceToFuturePoint() > (initialDistanceToFuturePoint/2) + stepDistance){
+                if(GetDistanceToForecast() > (initialDistanceToForecast/2) + stepDistance){
                     // This makes the leg move upwards for the first half of the step, resulting in an arcing effect
                     targetPoint.transform.position = Vector3.MoveTowards(currentPos, peakOfTheArc, stepDistance);
                 }
                 else{
                     targetPoint.transform.position = Vector3.MoveTowards(currentPos, futurePos, stepDistance);
                 }
-                if(WithinRangeOfFuturePoint()) initialDistanceToFuturePoint = 0;
+                if(WithinRangeOfForecast()){
+                    initialDistanceToForecast = 0;
+                }
             }
         }
 
@@ -191,19 +202,26 @@ public class TargetPointsController : MonoBehaviour
         }
 
         private Vector3 GetForecast(){
+            var futurePos = futurePoint.transform.position;
             var initial = futurePoint.transform.position + controller.transform.forward * controller.forecastDistance;
             // if base is a lot lower than futurepoint just return futurepoint
+            if(initial.y + controller.maximumDownstep < futurePos.y) return futurePos;
             // otherwise check above base pos to find the highest y for that x and z
+            // to be written
             return initial;
         }
 
-        public bool WithinRangeOfFuturePoint(){
+        // This should not take into account vertical distance, so we can have the spider take high steps?
+        // Would run into issues when climbing sloped though?
+        public float GetDistanceToForecast(){
+            return (GetForecast() - targetPoint.transform.position).magnitude;
+        }
 
-            return GetDistanceToFuturePoint() <= controller.maxDistForLegToBeInRange;
+        public bool WithinRangeOfForecast(){
+            return GetDistanceToForecast() <= controller.maxDistForLegToBeInRange;
         }
 
         public bool TooFarFromFuturePoint(){
-
             return GetDistanceToFuturePoint() >= controller.maxLegLag;
         }
 
