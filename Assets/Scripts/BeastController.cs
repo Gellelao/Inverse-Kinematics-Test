@@ -13,10 +13,12 @@ public class BeastController : MonoBehaviour
     public float verticalRepositionSpeed;
 
     private Vector3 moveDirection = Vector3.zero;
+    private Vector3 initialEulers;
 
     void Start()
     {
         characterController = GetComponent<CharacterController>();
+        initialEulers = transform.eulerAngles;
     }
 
     void Update()
@@ -39,5 +41,10 @@ public class BeastController : MonoBehaviour
     public void UpdatePos(Vector3 newPos){
         var difference = newPos - transform.position;
         characterController.Move(difference * Time.deltaTime * verticalRepositionSpeed);
+    }
+
+    public void Rotate(float xDiff, float zDiff){
+        // var nextRotation = Quaternion.Euler(initialEulers.x - xDiff*11, transform.eulerAngles.y, initialEulers.z - zDiff*11);
+        // transform.rotation = Quaternion.Lerp(transform.rotation, nextRotation, Time.deltaTime * rotationSpeed);
     }
 }

@@ -117,7 +117,7 @@ public class TargetPointsController : MonoBehaviour
                 // Debug.Log("No object below " + point.name);
             }
 
-            // Maybe do a check in a small radius to see if there s anything higher, and default to that if possible?
+            // Maybe do a check in a small radius to see if there is anything higher, and default to that if possible?
         }
 
         var averagePos = Vector3.zero;
@@ -130,6 +130,9 @@ public class TargetPointsController : MonoBehaviour
         // Update the body position to an average of the feet positions
         averagePos /= (numberOfLegsPerSide*2);
         parentController.UpdatePos(averagePos);
+
+        // Update body angle based on difference between leg heights
+        SetBodyRotation();
     }
 
     private bool CorrespondingPairIsNearFuturePoint(PointPair pair){
@@ -153,7 +156,39 @@ public class TargetPointsController : MonoBehaviour
         return Quaternion.AngleAxis(angle, Vector3.up)*vector;
     }
 
-    
+    // Don't see an obvious way to reuse code here unfortunately
+    private void SetBodyRotation(){
+        // Find Z difference, used to Pitch forward or backward
+        var averageOfFrontLegs = 0.0f;
+        averageOfFrontLegs += leftPoints[0].targetPoint.transform.position.y;
+        averageOfFrontLegs += rightPoints[0].targetPoint.transform.position.y;
+        averageOfFrontLegs /= 2;
+
+        var averageOfRearLegs = 0.0f;
+        averageOfRearLegs += leftPoints[leftPoints.Count-1].targetPoint.transform.position.y;
+        averageOfRearLegs += rightPoints[leftPoints.Count-1].targetPoint.transform.position.y;
+        averageOfRearLegs /= 2;
+
+        var zDifference = averageOfFrontLegs - averageOfRearLegs;
+
+        // Find X difference, used to Roll side to side
+        var averageOfLeftLegs = 0.0f;
+        for(var i = 0; i < numberOfLegsPerSide; i++){
+            averageOfLeftLegs += leftPoints[i].targetPoint.transform.position.y;
+        }
+        averageOfLeftLegs /= numberOfLegsPerSide;
+
+        var averageOfRightLegs = 0.0f;
+        for(var i = 0; i < numberOfLegsPerSide; i++){
+            averageOfRightLegs += rightPoints[i].targetPoint.transform.position.y;
+        }
+        averageOfRightLegs /= numberOfLegsPerSide;
+
+        var xDifference = averageOfLeftLegs - averageOfRightLegs;
+
+        // Now use the calculate differences to update the body rotation
+        parentController.Rotate(zDifference, xDifference);
+    }
 
     /// <summary>
     /// A target point and its associated future point

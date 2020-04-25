@@ -2094,10 +2094,10 @@ MonoBehaviour:
   targetPointPrefab: {fileID: 8859868302747069723, guid: 238d9f1c1ba1b3d40ba4b2ac3ce2d2ac,
     type: 3}
   numberOfLegsPerSide: 4
-  legDistanceFromBody: 3
+  legDistanceFromBody: 2.5
   angleBetweenLegs: 30
   maxClimbHeight: 5
-  maxLegLag: 1
+  maxLegLag: 1.5
   maxDistForLegToBeInRange: 0.05
   legSpeed: 25
   forecastDistance: 1
@@ -2387,13 +2387,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1260377760}
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
-  m_LocalScale: {x: 1, y: 3, z: 21}
+  m_LocalRotation: {x: -0.27059805, y: 0.6532815, z: -0.27059805, w: 0.6532815}
+  m_LocalPosition: {x: 0, y: 4.03, z: -13.03}
+  m_LocalScale: {x: 1, y: 14.28, z: 21}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 6
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: -45}
 --- !u!1 &1325825372
 GameObject:
   m_ObjectHideFlags: 0
@@ -3263,3 +3263,4 @@ MonoBehaviour:
   jumpSpeed: 8
   gravity: 20
   rotationSpeed: 10
+  verticalRepositionSpeed: 10
