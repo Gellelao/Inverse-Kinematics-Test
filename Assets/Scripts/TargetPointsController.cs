@@ -16,7 +16,9 @@ public class TargetPointsController : MonoBehaviour
     public float forecastDistance;
     public float stepHeight;
     public float maximumDownstep;
-    private List<PointPair> leftPoints; // The order is <point, futurepoint>
+
+    private BeastController parentController;
+    private List<PointPair> leftPoints;
     private List<PointPair> rightPoints;
     private List<PointPair> allPoints; // This list is just the two combined for easy iteration
     
@@ -24,6 +26,8 @@ public class TargetPointsController : MonoBehaviour
     
     void Start()
     {
+        parentController = transform.parent.GetComponent<BeastController>();
+
         leftPoints = new List<PointPair>();
         rightPoints = new List<PointPair>();
         allPoints = new List<PointPair>();
@@ -116,10 +120,16 @@ public class TargetPointsController : MonoBehaviour
             // Maybe do a check in a small radius to see if there s anything higher, and default to that if possible?
         }
 
+        var averagePos = Vector3.zero;
         // Move the targetPoints towards futurePoints if certain conditions are met
         foreach(PointPair pair in allPoints){
             pair.Update();
+            averagePos += pair.targetPoint.transform.position; // While we are looping, track an average of the feet positions
         }
+
+        // Update the body position to an average of the feet positions
+        averagePos /= (numberOfLegsPerSide*2);
+        parentController.UpdatePos(averagePos);
     }
 
     private bool CorrespondingPairIsNearFuturePoint(PointPair pair){
@@ -166,10 +176,7 @@ public class TargetPointsController : MonoBehaviour
         // Need to fix sliding when forecastdistance is set to any significant amount
         public void Update(){
             // Only move this leg if the matching leg on the other side of the body is close to grounded
-            // Couple of problems:
-            // * Doesn't stop all 4 legs on one side from moveing at once, which looks weird
-            // * Still some stickiness, seems like when legs are already outstretched, they wont move to normal pos? Might need some kind of direction check to see if foot is
-            //   in front or beind of forecast
+            // But doesn't stop all 4 legs on one side from moveing at once, which looks weird
             if(controller.CorrespondingPairIsNearFuturePoint(this))return;
 
             // Remake this check to only look backwards, there'll be issues when the forecast is too big and it thinks the leg is lagging behind but is actually too far ahead

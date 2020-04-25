@@ -10,6 +10,7 @@ public class BeastController : MonoBehaviour
     public float jumpSpeed = 8.0f;
     public float gravity = 20.0f;
     public float rotationSpeed;
+    public float verticalRepositionSpeed;
 
     private Vector3 moveDirection = Vector3.zero;
 
@@ -28,15 +29,15 @@ public class BeastController : MonoBehaviour
                 transform.rotation,
                 Quaternion.LookRotation(moveDirection),
                 Time.deltaTime * rotationSpeed
-        );
-}
-
-        // Apply gravity. Gravity is multiplied by deltaTime twice (once here, and once below
-        // when the moveDirection is multiplied by deltaTime). This is because gravity should be applied
-        // as an acceleration (ms^-2)
-        // moveDirection.y -= gravity * Time.deltaTime;
+            );
+        }
 
         // Move the controller
         characterController.Move(moveDirection * Time.deltaTime);
+    }
+
+    public void UpdatePos(Vector3 newPos){
+        var difference = newPos - transform.position;
+        characterController.Move(difference * Time.deltaTime * verticalRepositionSpeed);
     }
 }
