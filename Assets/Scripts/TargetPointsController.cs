@@ -16,6 +16,7 @@ public class TargetPointsController : MonoBehaviour
     public float forecastDistance;
     public float stepHeight;
     public float maximumDownstep;
+    public int maxLegsRaisedAtOnce;
 
     private BeastController parentController;
     private List<PointPair> leftPoints;
@@ -168,14 +169,34 @@ public class TargetPointsController : MonoBehaviour
             if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
             // The pair is in rightPoints, so look for the corresponding pair in leftPoints
             var corresponding = leftPoints[index];
-            return corresponding.WithinRangeOfForecast();
+            return !corresponding.TooFarFromFuturePoint();
         }
         else{
             // The pair is in leftPoints, so look for the corresponding pair in rightPoints
             var corresponding = rightPoints[index];
-            return corresponding.WithinRangeOfForecast();
+            return !corresponding.TooFarFromFuturePoint();
         }
     }
+
+    private bool TooManyLegsOnSameSideAreRaised(PointPair pair){
+        // Get index of that pair from leftPoints, if it is in there
+        var index = leftPoints.IndexOf(pair);
+        var setOfPairs = leftPoints;
+        if(index < 0){
+            index = rightPoints.IndexOf(pair);
+            if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
+            // The pair is in rightPoints, so look for the corresponding pair in leftPoints
+            setOfPairs = rightPoints;
+        }
+        var raisedLegs = 0;
+        foreach(PointPair p in setOfPairs){
+            if(setOfPairs.IndexOf(p) == index)continue;
+            if(!p.WithinRangeOfForecast())raisedLegs++;
+        }
+        Debug.Log(raisedLegs);
+        return raisedLegs > maxLegsRaisedAtOnce;
+    }
+    
 
 
 
@@ -219,8 +240,8 @@ public class TargetPointsController : MonoBehaviour
         // Need to fix sliding when forecastdistance is set to any significant amount
         public void UpdateTargetPoints(){
             // Only move this leg if the matching leg on the other side of the body is close to grounded
-            // But doesn't stop all 4 legs on one side from moveing at once, which looks weird
-            if(controller.CorrespondingPairIsNearFuturePoint(this))return;
+            //if(!controller.CorrespondingPairIsNearFuturePoint(this))return;
+            // if(controller.TooManyLegsOnSameSideAreRaised(this))return;
 
             // Remake this check to only look backwards, there'll be issues when the forecast is too big and it thinks the leg is lagging behind but is actually too far ahead
             if(TooFarFromFuturePoint()){

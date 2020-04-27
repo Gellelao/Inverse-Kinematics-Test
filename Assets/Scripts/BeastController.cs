@@ -47,7 +47,7 @@ public class BeastController : MonoBehaviour
     }
 
     public void Rotate(float xDiff, float zDiff){
-        var nextRotation = Quaternion.Euler(initialEulers.x - xDiff*15, transform.eulerAngles.y, initialEulers.z - zDiff*11);
+        var nextRotation = Quaternion.Euler(initialEulers.x - xDiff*13, transform.eulerAngles.y, initialEulers.z - zDiff*11);
         transform.rotation = Quaternion.Lerp(transform.rotation, nextRotation, Time.deltaTime * rotationSpeed);
     }
 }
