@@ -65,13 +65,17 @@ public class TargetPointsController : MonoBehaviour
             var targetPoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
             targetPoint.name = "TargetPoint" + nameCounter;
 
-            var futurePoint = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            var anchor = Instantiate(targetPointPrefab, transform.position + thisLegPos*legDistanceFromBody, transform.rotation);
+            anchor.name = "Anchor" + nameCounter;
+            anchor.GetComponent<Renderer>().material.SetColor("_Color", Color.green);
+            // Add anchors as children, because they need to always follow the creature
+            anchor.transform.parent = transform;
+
+            var futurePoint = Instantiate(targetPointPrefab, anchor.transform.position, transform.rotation);
             futurePoint.name = "FuturePoint" + nameCounter;
             futurePoint.GetComponent<Renderer>().material.SetColor("_Color", Color.blue);
-            // Add future points as children, because they need to always follow the creature
-            futurePoint.transform.parent = transform;
             
-            setOfPoints.Add(new PointPair(this, targetPoint, futurePoint));
+            setOfPoints.Add(new PointPair(this, targetPoint, futurePoint, anchor));
             nameCounter++;
         }
 
@@ -96,60 +100,26 @@ public class TargetPointsController : MonoBehaviour
 
     void Update()
     {
-        foreach(PointPair p in allPoints){
-        }
         // Make each future point sit on the ground, within the limit of maxClimbHeight
         foreach(PointPair pair in allPoints){
-            GameObject point = pair.futurePoint;
-            // The point in space we want to look downwards from
-            Vector3 groundCastOrigin = new Vector3(point.transform.position.x, transform.position.y + maxClimbHeight, point.transform.position.z);
-
-            int layerMask = 1 << 8; // Layer 8 is the targetPoints layer
-            layerMask = ~layerMask; // Invert it to exlude that layer - we don't want to collide with the targetPoint objects
-
-            var down = new Vector3(0,-1,0);
-
-            RaycastHit hit;
-            if(Physics.Raycast(groundCastOrigin, down, out hit, Mathf.Infinity, layerMask)){
-                point.transform.position = new Vector3(point.transform.position.x, hit.point.y, point.transform.position.z);
-            }
-            else{
-                // Debug.Log("No object below " + point.name);
-            }
+            pair.UpdateFuturePoints();
 
             // Maybe do a check in a small radius to see if there is anything higher, and default to that if possible?
         }
 
-        var averagePos = Vector3.zero;
+        var averageHeight = 0.0f;
         // Move the targetPoints towards futurePoints if certain conditions are met
         foreach(PointPair pair in allPoints){
-            pair.Update();
-            averagePos += pair.targetPoint.transform.position; // While we are looping, track an average of the feet positions
+            pair.UpdateTargetPoints();
+            averageHeight += pair.targetPoint.transform.position.y; // While we are looping, track an average of the feet positions
         }
 
         // Update the body position to an average of the feet positions
-        averagePos /= (numberOfLegsPerSide*2);
-        parentController.UpdatePos(averagePos);
+        averageHeight /= (numberOfLegsPerSide*2);
+        parentController.UpdateHeight(averageHeight);
 
         // Update body angle based on difference between leg heights
         SetBodyRotation();
-    }
-
-    private bool CorrespondingPairIsNearFuturePoint(PointPair pair){
-        // Get index of that pair from leftPoints, if it is in there
-        var index = leftPoints.IndexOf(pair);
-        if(index < 0){
-            index = rightPoints.IndexOf(pair);
-            if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
-            // The pair is in rightPoints, so look for the corresponding pair in leftPoints
-            var corresponding = leftPoints[index];
-            return corresponding.WithinRangeOfForecast();
-        }
-        else{
-            // The pair is in leftPoints, so look for the corresponding pair in rightPoints
-            var corresponding = rightPoints[index];
-            return corresponding.WithinRangeOfForecast();
-        }
     }
 
     private Vector3 Rotate(Vector3 vector, float angle){
@@ -190,6 +160,26 @@ public class TargetPointsController : MonoBehaviour
         parentController.Rotate(zDifference, xDifference);
     }
 
+    private bool CorrespondingPairIsNearFuturePoint(PointPair pair){
+        // Get index of that pair from leftPoints, if it is in there
+        var index = leftPoints.IndexOf(pair);
+        if(index < 0){
+            index = rightPoints.IndexOf(pair);
+            if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
+            // The pair is in rightPoints, so look for the corresponding pair in leftPoints
+            var corresponding = leftPoints[index];
+            return corresponding.WithinRangeOfForecast();
+        }
+        else{
+            // The pair is in leftPoints, so look for the corresponding pair in rightPoints
+            var corresponding = rightPoints[index];
+            return corresponding.WithinRangeOfForecast();
+        }
+    }
+
+
+
+    // ==================================================================================
     /// <summary>
     /// A target point and its associated future point
     /// </summary>
@@ -197,19 +187,37 @@ public class TargetPointsController : MonoBehaviour
         private TargetPointsController controller;
         public GameObject targetPoint {get; private set;}
         public GameObject futurePoint {get; private set;}
+        private GameObject anchor; // This is the initial position of the futurePoint, and should always remain fixed in the same position relative to the spider body
 
         private float initialDistanceToForecast = 0;
 
-        public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint){
+        public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint, GameObject anchor){
             this.controller = controller;
             this.targetPoint = targetPoint;
             this.futurePoint = futurePoint;
+            this.anchor = anchor;
 
             initialDistanceToForecast = 0;
         }
 
+        public void UpdateFuturePoints(){
+            var anchorPos = anchor.transform.position;
+            // anchor.y should be the y position of the controller, because we instantiate the futurepoint at the controller's y, and the anchor is derived from the futurepoint's inital position
+            Vector3 groundCastOrigin = new Vector3(anchorPos.x, anchorPos.y + controller.maxClimbHeight, anchorPos.z);
+
+            int layerMask = 1 << 8; // Layer 8 is the targetPoints layer
+            layerMask = ~layerMask; // Invert it to exlude that layer - we don't want to collide with the targetPoint objects
+
+            var down = new Vector3(0,-1,0);
+
+            RaycastHit hit;
+            if(Physics.Raycast(groundCastOrigin, down, out hit, Mathf.Infinity, layerMask)){
+                futurePoint.transform.position = new Vector3(anchor.transform.position.x, hit.point.y, anchor.transform.position.z);
+            }
+        }
+
         // Need to fix sliding when forecastdistance is set to any significant amount
-        public void Update(){
+        public void UpdateTargetPoints(){
             // Only move this leg if the matching leg on the other side of the body is close to grounded
             // But doesn't stop all 4 legs on one side from moveing at once, which looks weird
             if(controller.CorrespondingPairIsNearFuturePoint(this))return;

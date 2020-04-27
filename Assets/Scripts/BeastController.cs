@@ -38,13 +38,16 @@ public class BeastController : MonoBehaviour
         characterController.Move(moveDirection * Time.deltaTime);
     }
 
-    public void UpdatePos(Vector3 newPos){
-        var difference = newPos - transform.position;
-        characterController.Move(difference * Time.deltaTime * verticalRepositionSpeed);
+    public void UpdateHeight(float newHeight){
+        var newPos = transform.position;
+        newPos.y = newHeight;
+        var diff = newPos - transform.position;
+
+        characterController.Move(diff * Time.deltaTime * verticalRepositionSpeed);
     }
 
     public void Rotate(float xDiff, float zDiff){
-        // var nextRotation = Quaternion.Euler(initialEulers.x - xDiff*11, transform.eulerAngles.y, initialEulers.z - zDiff*11);
-        // transform.rotation = Quaternion.Lerp(transform.rotation, nextRotation, Time.deltaTime * rotationSpeed);
+        var nextRotation = Quaternion.Euler(initialEulers.x - xDiff*15, transform.eulerAngles.y, initialEulers.z - zDiff*11);
+        transform.rotation = Quaternion.Lerp(transform.rotation, nextRotation, Time.deltaTime * rotationSpeed);
     }
 }
