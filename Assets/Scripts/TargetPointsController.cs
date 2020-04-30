@@ -16,7 +16,7 @@ public class TargetPointsController : MonoBehaviour
     public float forecastDistance;
     public float stepHeight;
     public float maximumDownstep;
-    public int maxLegsRaisedAtOnce;
+     public int maxLegsRaisedAtOnce;
 
     private BeastController parentController;
     private List<PointPair> leftPoints;
@@ -108,15 +108,16 @@ public class TargetPointsController : MonoBehaviour
             // Maybe do a check in a small radius to see if there is anything higher, and default to that if possible?
         }
 
-        var averageHeight = 0.0f;
         // Move the targetPoints towards futurePoints if certain conditions are met
         foreach(PointPair pair in allPoints){
             pair.UpdateTargetPoints();
-            averageHeight += pair.targetPoint.transform.position.y; // While we are looping, track an average of the feet positions
         }
 
+        var averageHeight = leftPoints[0].targetPoint.transform.position.y;
+        averageHeight += rightPoints[0].targetPoint.transform.position.y;
+
         // Update the body position to an average of the feet positions
-        averageHeight /= (numberOfLegsPerSide*2);
+        averageHeight /= 2;
         parentController.UpdateHeight(averageHeight);
 
         // Update body angle based on difference between leg heights
@@ -196,8 +197,6 @@ public class TargetPointsController : MonoBehaviour
         Debug.Log(raisedLegs);
         return raisedLegs > maxLegsRaisedAtOnce;
     }
-    
-
 
 
     // ==================================================================================
@@ -223,17 +222,16 @@ public class TargetPointsController : MonoBehaviour
 
         public void UpdateFuturePoints(){
             var anchorPos = anchor.transform.position;
-            // anchor.y should be the y position of the controller, because we instantiate the futurepoint at the controller's y, and the anchor is derived from the futurepoint's inital position
-            Vector3 groundCastOrigin = new Vector3(anchorPos.x, anchorPos.y + controller.maxClimbHeight, anchorPos.z);
+            Vector3 groundCastOrigin = anchor.transform.position + anchor.transform.up*controller.maxClimbHeight;
 
             int layerMask = 1 << 8; // Layer 8 is the targetPoints layer
             layerMask = ~layerMask; // Invert it to exlude that layer - we don't want to collide with the targetPoint objects
 
-            var down = new Vector3(0,-1,0);
+            var down = -anchor.transform.up;
 
             RaycastHit hit;
             if(Physics.Raycast(groundCastOrigin, down, out hit, Mathf.Infinity, layerMask)){
-                futurePoint.transform.position = new Vector3(anchor.transform.position.x, hit.point.y, anchor.transform.position.z);
+                futurePoint.transform.position = new Vector3(hit.point.x, hit.point.y, hit.point.z);
             }
         }
 
@@ -274,16 +272,43 @@ public class TargetPointsController : MonoBehaviour
 
         private Vector3 GetForecast(){
             var futurePos = futurePoint.transform.position;
-            var initial = futurePoint.transform.position + controller.transform.forward * controller.forecastDistance;
-            // if base is a lot lower than futurepoint just return futurepoint
-            if(initial.y + controller.maximumDownstep < futurePos.y) return futurePos;
-            // otherwise check above base pos to find the highest y for that x and z
-            // to be written
-            return initial;
+            // Calcluate an ideal forecast position, then if that is not valid revert to either just the FuturePoint or potentially do a closest point check
+            var ideal = futurePos + controller.transform.forward * controller.forecastDistance;
+            // if ideal is a lot lower than futurepoint just return futurepoint
+            if(ideal.y + controller.maximumDownstep < futurePos.y) return futurePos;
+
+            // do a raycast to see what collider the ideal might be inside
+            RaycastHit hit;
+            if(Physics.Raycast(futurePos, controller.transform.forward, out hit, controller.forecastDistance)){
+                // POTENTIAL BUG LOCATION: not using a layer mask here, but in testing didn't have any problems colliding with self. Keep an eye on this...
+
+                // Get closest point on surface of collider.
+                // If that is further than forecast distance from futuerpoint, return futurepoint
+
+                var collidee = hit.collider;
+                if(IsPointWithinCollider(collidee, ideal)){
+                    // ideal is within a collider, so first lets check if we can put the foot on the top of that collider
+                    // For now just use Vector3.down but it might be a good idea to update this to use a relative down direction (like spider.down?)
+                    var castOrigin = new Vector3(ideal.x, ideal.y + controller.maxClimbHeight, ideal.z);
+                    RaycastHit hit2;
+                    if(Physics.Raycast(castOrigin, Vector3.down, out hit2, controller.maxClimbHeight)){
+                        var surfacePoint = hit2.point;
+                        return surfacePoint;
+                    }
+
+                    // can't do that, so lets put the foot on the closest point on the surface of the collider
+                    var nearest = collidee.ClosestPoint(ideal);
+                    if((futurePos - nearest).magnitude > controller.forecastDistance) return futurePos;
+                    return nearest;
+                }
+            }
+
+            // ideal has passed all checks so it is ok to move the foot towards that
+            return ideal;
         }
 
         // This should not take into account vertical distance, so we can have the spider take high steps?
-        // Would run into issues when climbing sloped though?
+        // Would run into issues when climbing slopes though?
         public float GetDistanceToForecast(){
             return (GetForecast() - targetPoint.transform.position).magnitude;
         }
@@ -294,6 +319,11 @@ public class TargetPointsController : MonoBehaviour
 
         public bool TooFarFromFuturePoint(){
             return GetDistanceToFuturePoint() >= controller.maxLegLag;
+        }
+
+        public static bool IsPointWithinCollider(Collider collider, Vector3 point)
+        {
+            return (collider.ClosestPoint(point) - point).sqrMagnitude < Mathf.Epsilon * Mathf.Epsilon;
         }
 
         public override string ToString(){
