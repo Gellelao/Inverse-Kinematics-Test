@@ -1,1 +1,1 @@
-[spiderClimb.gif]()
+![](spiderClimb.gif)
