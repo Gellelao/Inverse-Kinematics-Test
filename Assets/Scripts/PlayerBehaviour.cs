@@ -10,7 +10,7 @@ public class PlayerBehaviour : MonoBehaviour
     public float jumpSpeed;
     public float gravity;
     public float rotationSpeed;
-    public float tiltStrength;
+    public float tiltDampening;
 
     private Vector3 moveDirection = Vector3.zero;
     private Vector3 initialEulers;
@@ -45,7 +45,7 @@ public class PlayerBehaviour : MonoBehaviour
             var lookPlane = new Vector3(moveDirection.x, 0, moveDirection.z);
             transform.rotation = Quaternion.Slerp(
                 transform.rotation,
-                TiltRotationTowardsVelocity(Quaternion.LookRotation(lookPlane), Vector3.up, lookPlane, tiltStrength),
+                TiltRotationTowardsVelocity(Quaternion.LookRotation(lookPlane), Vector3.up, lookPlane, tiltDampening),
                 Time.deltaTime * rotationSpeed
             );
         }
