@@ -104,19 +104,16 @@ public class TargetPointsController : MonoBehaviour
         // Make each future point sit on the ground, within the limit of maxClimbHeight
         foreach(PointPair pair in allPoints){
             pair.UpdateFuturePoints();
-
-            // Maybe do a check in a small radius to see if there is anything higher, and default to that if possible?
         }
 
-        // Move the targetPoints towards futurePoints if certain conditions are met
+        // Move the targetPoints towards forecasts if certain conditions are met
         foreach(PointPair pair in allPoints){
             pair.UpdateTargetPoints();
         }
 
+        // Update the body position to an average of the feet positions
         var averageHeight = leftPoints[0].targetPoint.transform.position.y;
         averageHeight += rightPoints[0].targetPoint.transform.position.y;
-
-        // Update the body position to an average of the feet positions
         averageHeight /= 2;
         parentController.UpdateHeight(averageHeight);
 
