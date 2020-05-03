@@ -10,6 +10,7 @@ public class PlayerBehaviour : MonoBehaviour
     public float jumpSpeed;
     public float gravity;
     public float rotationSpeed;
+    public float tiltStrength;
 
     private Vector3 moveDirection = Vector3.zero;
     private Vector3 initialEulers;
@@ -42,12 +43,11 @@ public class PlayerBehaviour : MonoBehaviour
         if (Input.GetAxis("Horizontal") != 0 || Input.GetAxis("Vertical") != 0)
         {
             var lookPlane = new Vector3(moveDirection.x, 0, moveDirection.z);
-            // transform.rotation = Quaternion.Slerp(
-            //     transform.rotation,
-            //     Quaternion.LookRotation(lookPlane),
-            //     Time.deltaTime * rotationSpeed
-            // );
-            transform.rotation = TiltRotationTowardsVelocity(Quaternion.LookRotation(lookPlane), Vector3.up, lookPlane, 100);
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                TiltRotationTowardsVelocity(Quaternion.LookRotation(lookPlane), Vector3.up, lookPlane, tiltStrength),
+                Time.deltaTime * rotationSpeed
+            );
         }
 
         // Apply gravity. Gravity is multiplied by deltaTime twice (once here, and once below
@@ -79,15 +79,9 @@ public class PlayerBehaviour : MonoBehaviour
      /// <returns>returns currentRotation modified by a tilt</returns>
      public static Quaternion TiltRotationTowardsVelocity( Quaternion cleanRotation, Vector3 referenceUp, Vector3 vel, float velMagFor45Degree )
      {
-         Vector3 rotAxis = Vector3.Cross( referenceUp, vel );
-         float tiltAngle = Mathf.Atan( vel.magnitude /velMagFor45Degree) *Mathf.Rad2Deg;
- 
-         //    Helping tp visualize, https://docs.unity3d.com/ScriptReference/Vector3.Cross.html
-             //    Debug.DrawRay( myTransform.position, referenceUp,    Color.yellow    );    //leftHand thumb
-             //    Debug.DrawRay( myTransform.position, vel,            Color.green        );    //leftHand index
-             //    Debug.DrawRay( myTransform.position, rotAxis,        Color.cyan        );    //leftHand middle
- 
-         return Quaternion.AngleAxis( tiltAngle, rotAxis ) *cleanRotation;    //order matters
+        Vector3 rotAxis = Vector3.Cross( referenceUp, vel );
+        float tiltAngle = Mathf.Atan( vel.magnitude /velMagFor45Degree) *Mathf.Rad2Deg;
+        return Quaternion.AngleAxis( tiltAngle, rotAxis ) *cleanRotation;    //order matters
      }
 
 }
