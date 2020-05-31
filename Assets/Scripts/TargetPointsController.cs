@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿using UnityEngine.Assertions;
 using System.Collections.Generic;
 using UnityEngine;
 using DitzelGames.FastIK;
@@ -159,40 +159,32 @@ public class TargetPointsController : MonoBehaviour
         parentController.Rotate(zDifference, xDifference);
     }
 
-    private bool CorrespondingPairIsNearFuturePoint(PointPair pair){
+    private bool AllSurroundingLegsGrounded(PointPair pair){
+        List<PointPair> relevantPairs = new List<PointPair>();
+        
         // Get index of that pair from leftPoints, if it is in there
         var index = leftPoints.IndexOf(pair);
         if(index < 0){
+            // If we look for it in leftPoints and get -1, try rightPoints
             index = rightPoints.IndexOf(pair);
             if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
-            // The pair is in rightPoints, so look for the corresponding pair in leftPoints
-            var corresponding = leftPoints[index];
-            return !corresponding.TooFarFromFuturePoint();
+
+            relevantPairs.Add(leftPoints[index]); // Matching leg on other side
+            if(index > 0) relevantPairs.Add(rightPoints[index-1]); // Leg in front
+            if(index < numberOfLegsPerSide-1) relevantPairs.Add(rightPoints[index+1]); // Leg in behind
         }
         else{
-            // The pair is in leftPoints, so look for the corresponding pair in rightPoints
-            var corresponding = rightPoints[index];
-            return !corresponding.TooFarFromFuturePoint();
+            // The pair is in leftPoints
+            relevantPairs.Add(rightPoints[index]); // Matching leg on other side
+            if(index > 0) relevantPairs.Add(leftPoints[index-1]); // Leg in front
+            if(index < numberOfLegsPerSide-1) relevantPairs.Add(leftPoints[index+1]); // Leg in behind
         }
-    }
-
-    private bool TooManyLegsOnSameSideAreRaised(PointPair pair){
-        // Get index of that pair from leftPoints, if it is in there
-        var index = leftPoints.IndexOf(pair);
-        var setOfPairs = leftPoints;
-        if(index < 0){
-            index = rightPoints.IndexOf(pair);
-            if(index < 0) throw new UnityException("Pair not found in leftPoints nor rightPoints");
-            // The pair is in rightPoints, so look for the corresponding pair in leftPoints
-            setOfPairs = rightPoints;
-        }
+        Assert.IsTrue(relevantPairs.Count > 0 && relevantPairs.Count <= 3);
         var raisedLegs = 0;
-        foreach(PointPair p in setOfPairs){
-            if(setOfPairs.IndexOf(p) == index)continue;
+        foreach(PointPair p in relevantPairs){
             if(!p.WithinRangeOfForecast())raisedLegs++;
         }
-        Debug.Log(raisedLegs);
-        return raisedLegs > maxLegsRaisedAtOnce;
+        return raisedLegs == 0;
     }
 
 
@@ -232,10 +224,9 @@ public class TargetPointsController : MonoBehaviour
             }
         }
 
-        // Need to fix sliding when forecastdistance is set to any significant amount
         public void UpdateTargetPoints(){
             // Only move this leg if the matching leg on the other side of the body is close to grounded
-            //if(!controller.CorrespondingPairIsNearFuturePoint(this))return;
+            if(!controller.AllSurroundingLegsGrounded(this))return;
             // if(controller.TooManyLegsOnSameSideAreRaised(this))return;
 
             // Remake this check to only look backwards, there'll be issues when the forecast is too big and it thinks the leg is lagging behind but is actually too far ahead
