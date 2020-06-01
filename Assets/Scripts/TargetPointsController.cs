@@ -16,7 +16,7 @@ public class TargetPointsController : MonoBehaviour
     public float forecastDistance;
     public float stepHeight;
     public float maximumDownstep;
-     public int maxLegsRaisedAtOnce;
+    public int maxLegsRaisedAtOnce;
 
     private BeastController parentController;
     private List<PointPair> leftPoints;
@@ -182,7 +182,7 @@ public class TargetPointsController : MonoBehaviour
         Assert.IsTrue(relevantPairs.Count > 0 && relevantPairs.Count <= 3);
         var raisedLegs = 0;
         foreach(PointPair p in relevantPairs){
-            if(!p.WithinRangeOfForecast())raisedLegs++;
+            if(p.movingTowardForecast())raisedLegs++;
         }
         return raisedLegs == 0;
     }
@@ -200,13 +200,15 @@ public class TargetPointsController : MonoBehaviour
 
         private float initialDistanceToForecast = 0;
 
+        public bool movingTowardForecast() => initialDistanceToForecast != 0;
+
         public PointPair(TargetPointsController controller, GameObject targetPoint, GameObject futurePoint, GameObject anchor){
             this.controller = controller;
             this.targetPoint = targetPoint;
             this.futurePoint = futurePoint;
             this.anchor = anchor;
 
-            initialDistanceToForecast = 0;
+            initialDistanceToForecast = GetDistanceToForecast();
         }
 
         public void UpdateFuturePoints(){
@@ -225,12 +227,9 @@ public class TargetPointsController : MonoBehaviour
         }
 
         public void UpdateTargetPoints(){
-            // Only move this leg if the matching leg on the other side of the body is close to grounded
-            if(!controller.AllSurroundingLegsGrounded(this))return;
-            // if(controller.TooManyLegsOnSameSideAreRaised(this))return;
-
             // Remake this check to only look backwards, there'll be issues when the forecast is too big and it thinks the leg is lagging behind but is actually too far ahead
-            if(TooFarFromFuturePoint()){
+            // This is saying: if this leg has lagged behind, and the surrounding legs are not also moving, then start moving toward the forecast
+            if(TooFarFromFuturePoint() && controller.AllSurroundingLegsGrounded(this)){
                 initialDistanceToForecast = GetDistanceToForecast();
             }
 
@@ -252,10 +251,6 @@ public class TargetPointsController : MonoBehaviour
                     initialDistanceToForecast = 0;
                 }
             }
-        }
-
-        public float GetDistanceToFuturePoint(){
-            return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
         }
 
         private Vector3 GetForecast(){
@@ -293,6 +288,10 @@ public class TargetPointsController : MonoBehaviour
 
             // ideal has passed all checks so it is ok to move the foot towards that
             return ideal;
+        }
+
+        public float GetDistanceToFuturePoint(){
+            return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
         }
 
         // This should not take into account vertical distance, so we can have the spider take high steps?

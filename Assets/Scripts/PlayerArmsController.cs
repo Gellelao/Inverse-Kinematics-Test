@@ -46,7 +46,6 @@ public class PlayerArmsController : MonoBehaviour
     void Update()
     {
         var moveMagnitude = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical")).magnitude;
-        Debug.Log(moveMagnitude);
         if (moveMagnitude > narutoThreshold)
         {
             leftTarget.transform.localPosition = Vector3.MoveTowards(leftTarget.transform.localPosition, leftTargetMoving, armSpeed*Time.deltaTime);
