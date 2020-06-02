@@ -294,10 +294,15 @@ public class TargetPointsController : MonoBehaviour
             return (futurePoint.transform.position - targetPoint.transform.position).magnitude;
         }
 
-        // This should not take into account vertical distance, so we can have the spider take high steps?
-        // Would run into issues when climbing slopes though?
+        // Made this a bit complicated because the spider leg height when stepping was interfering
         public float GetDistanceToForecast(){
-            return (GetForecast() - targetPoint.transform.position).magnitude;
+            // Make a vertical plane at the position of the forecast, pointing backwards towards where we
+            // expect the current position of the targetPoint to be.
+            Plane plane = new Plane();
+            plane.SetNormalAndPosition(controller.gameObject.transform.forward*-1, GetForecast());
+            // GetDistanceToPoint will get closest point on the plane. Since our plane is vertical, this
+            // effectively ignores the vertical difference between the fgorecast and target point
+            return Mathf.Abs(plane.GetDistanceToPoint(targetPoint.transform.position));
         }
 
         public bool WithinRangeOfForecast(){
