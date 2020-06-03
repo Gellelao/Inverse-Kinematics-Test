@@ -1540,11 +1540,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b896e835908d5cf4fa4f526c9b1c5ab0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 4
+  speed: 6
   jumpSpeed: 15
   gravity: 100
-  rotationSpeed: 15
-  tiltDampening: 40
+  rotationSpeed: 20
+  sideTiltSpeed: 50
+  tiltDampening: 60
 --- !u!33 &677606697
 MeshFilter:
   m_ObjectHideFlags: 0
