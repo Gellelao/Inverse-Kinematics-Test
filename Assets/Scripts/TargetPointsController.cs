@@ -300,7 +300,7 @@ public class TargetPointsController : MonoBehaviour
             // expect the current position of the targetPoint to be.
             Plane plane = new Plane();
             plane.SetNormalAndPosition(controller.gameObject.transform.forward*-1, GetForecast());
-            // GetDistanceToPoint will get closest point on the plane. Since our plane is vertical, this
+            // GetDistanceToPoint will use closest point on the plane. Since our plane is vertical, this
             // effectively ignores the vertical difference between the fgorecast and target point
             return Mathf.Abs(plane.GetDistanceToPoint(targetPoint.transform.position));
         }
